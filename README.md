@@ -4,7 +4,7 @@ Small CRUD app for the CodeBuild → ECR → Helm → Argo CD lab. This repo cur
 
 - `frontend/`: static HTML/CSS/JS served by Nginx; `/api/` proxies to `taskboard-api`.
 - `backend/`: FastAPI CRUD routes, with Redis used for task storage.
-- `k8s/kind.yaml`: temporary local deployment for validating the images before building the Helm chart.
+- `k8s/kind.yaml`: local deployment with a 1 GiB Redis PVC for validating the images before building the Helm chart.
 
 Prerequisites: Docker running, `kind`, `kubectl`, and a kind cluster. Run commands from the repository root. On a Mac with Docker Desktop, give Docker enough memory for your existing cluster plus these three Pods.
 
@@ -20,7 +20,7 @@ Open <http://localhost:8080> and add a task. Stop with `docker compose down` (ad
 
 ## Build and test in kind
 
-Check your cluster name with `kind get clusters`. If it is `k8s-live-demo`, use that value below; otherwise replace it. Confirm `kubectl config current-context` matches the cluster you want to use.
+Check your cluster name with `kind get clusters`. If it is `k8s-live-demo`, use that value below; otherwise replace it. Confirm `kubectl config current-context` matches the cluster you want to use. On an existing installation, back up any tasks you want to keep **before** applying the changed Redis Deployment: the old Redis Pod used ephemeral storage and its in-memory tasks cannot move automatically onto the new volume. With a port-forward running, `curl -sS http://localhost:8080/api/tasks > tasks-backup.json` exports them; use `python3 scripts/restore_tasks.py tasks-backup.json` after the new Redis Pod is ready. The restore assigns new IDs and retains titles and statuses.
 
 ```bash
 kind get clusters
@@ -29,6 +29,7 @@ docker build -t taskboard-api:local ./backend
 docker build -t taskboard-web:local ./frontend
 kind load docker-image taskboard-api:local taskboard-web:local --name k8s-live-demo
 kubectl apply -f k8s/kind.yaml
+kubectl -n taskboard get pvc
 kubectl -n taskboard rollout status deployment/taskboard-redis --timeout=120s
 kubectl -n taskboard rollout status deployment/taskboard-api --timeout=120s
 kubectl -n taskboard rollout status deployment/taskboard-web --timeout=120s
@@ -65,7 +66,16 @@ kubectl -n taskboard get pods
 kubectl -n taskboard describe pod -l app=taskboard-api
 ```
 
-This kind manifest deliberately has no Redis volume: task data is lost when its Pod is replaced. Compose uses a local Docker volume. We will decide on persistence as part of the Helm/EKS phase.
+Redis writes append-only files to a PVC mounted at `/data`. Verify persistence by adding a task, then recreating the Redis Pod:
+
+```bash
+kubectl -n taskboard delete pod -l app=taskboard-redis
+kubectl -n taskboard rollout status deployment/taskboard-redis --timeout=120s
+curl -sS http://localhost:8080/api/tasks
+kubectl -n taskboard get pvc
+```
+
+The task should still be present. If the PVC stays `Pending`, check `kubectl get storageclass` and `kubectl -n taskboard describe pvc taskboard-redis-data`; the cluster needs a default dynamic StorageClass. This volume is stored in your kind node and **will not survive deleting the kind cluster**. Redis uses `appendfsync everysec`, so a sudden host failure can lose roughly the last second of writes.
 
 ## Troubleshooting and cleanup
 
@@ -78,4 +88,4 @@ kubectl -n taskboard logs deployment/taskboard-redis
 kubectl delete -f k8s/kind.yaml
 ```
 
-`ErrImageNeverPull` means the local image is missing from that kind cluster; repeat `kind load docker-image ... --name <actual-cluster-name>`. If you rebuild an image under the same `:local` tag, reload it and run `kubectl -n taskboard rollout restart deployment/taskboard-api deployment/taskboard-web`.
+**Cleanup deletes the PVC and its data.** For routine app updates, use `kubectl apply -f k8s/kind.yaml` and keep the claim. `ErrImageNeverPull` means the local image is missing from that kind cluster; repeat `kind load docker-image ... --name <actual-cluster-name>`. If you rebuild an image under the same `:local` tag, reload it and run `kubectl -n taskboard rollout restart deployment/taskboard-api deployment/taskboard-web`.
