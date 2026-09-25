@@ -36,6 +36,7 @@ def task_key(task_id: int) -> str:
 
 
 @app.get("/health/live")
+
 async def live():
     return {"status": "alive"}
 
