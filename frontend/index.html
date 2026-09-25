@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Orbit • Taskboard</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar"><div class="brand"><span class="brand-mark">✦</span> ORBIT <span class="brand-sub">/ taskboard</span></div><span class="pill">Kubernetes lab</span></header>
+    <section class="hero"><div><p class="eyebrow">YOUR WORKSPACE, IN MOTION</p><h1>Make room for <em>progress.</em></h1><p class="subtitle">A small place for the things you want to get done. Create a task, move it along, and watch your deployment come to life.</p></div><div class="orbit-art" aria-hidden="true"><div class="ring ring-one"></div><div class="ring ring-two"></div><div class="planet">✦</div></div></section>
+    <section class="toolbar"><form id="task-form"><label for="title" class="sr-only">New task</label><input id="title" name="title" maxlength="120" placeholder="What needs doing?" required><button type="submit">+ Add task</button></form><span id="task-count">0 tasks</span></section>
+    <p id="notice" role="status" aria-live="polite"></p>
+    <section class="board" aria-label="Task board"><div class="column" data-status="todo"><h2><span class="dot dot-todo"></span> To do <span class="column-count" id="count-todo">0</span></h2><div class="cards" id="cards-todo"></div></div><div class="column" data-status="doing"><h2><span class="dot dot-doing"></span> In progress <span class="column-count" id="count-doing">0</span></h2><div class="cards" id="cards-doing"></div></div><div class="column" data-status="done"><h2><span class="dot dot-done"></span> Done <span class="column-count" id="count-done">0</span></h2><div class="cards" id="cards-done"></div></div></section>
+    <footer>Built for learning • FastAPI + Redis + Nginx</footer>
+  </main>
+</body>
+</html>
