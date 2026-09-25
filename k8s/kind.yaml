@@ -3,6 +3,17 @@ kind: Namespace
 metadata:
   name: taskboard
 ---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: taskboard-redis-data
+  namespace: taskboard
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -21,7 +32,11 @@ spec:
       containers:
         - name: redis
           image: redis:7-alpine
+          command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
           ports: [{containerPort: 6379}]
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
           readinessProbe:
             exec:
               command: ["redis-cli", "ping"]
@@ -35,6 +50,10 @@ spec:
           resources:
             requests: {cpu: 25m, memory: 48Mi}
             limits: {cpu: 200m, memory: 128Mi}
+      volumes:
+        - name: redis-data
+          persistentVolumeClaim:
+            claimName: taskboard-redis-data
 ---
 apiVersion: v1
 kind: Service
