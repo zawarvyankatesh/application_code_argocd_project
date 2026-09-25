@@ -1,0 +1,28 @@
+services:
+  taskboard-redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  taskboard-api:
+    build: ./backend
+    image: taskboard-api:local
+    environment:
+      REDIS_URL: redis://taskboard-redis:6379/0
+    depends_on:
+      taskboard-redis:
+        condition: service_healthy
+  taskboard-web:
+    build: ./frontend
+    image: taskboard-web:local
+    depends_on:
+      - taskboard-api
+    ports:
+      - "8080:80"
+volumes:
+  redis-data:
