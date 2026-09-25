@@ -1,0 +1,123 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: taskboard
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: taskboard-redis
+  namespace: taskboard
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: {app: taskboard-redis}
+  template:
+    metadata:
+      labels: {app: taskboard-redis}
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports: [{containerPort: 6379}]
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 25m, memory: 48Mi}
+            limits: {cpu: 200m, memory: 128Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: taskboard-redis
+  namespace: taskboard
+spec:
+  selector: {app: taskboard-redis}
+  ports: [{port: 6379, targetPort: 6379}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: taskboard-api
+  namespace: taskboard
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: taskboard-api}
+  template:
+    metadata:
+      labels: {app: taskboard-api}
+    spec:
+      containers:
+        - name: api
+          image: taskboard-api:local
+          imagePullPolicy: Never
+          env:
+            - name: REDIS_URL
+              value: redis://taskboard-redis:6379/0
+          ports: [{containerPort: 8000}]
+          readinessProbe:
+            httpGet: {path: /health/ready, port: 8000}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /health/live, port: 8000}
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 25m, memory: 64Mi}
+            limits: {cpu: 300m, memory: 256Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: taskboard-api
+  namespace: taskboard
+spec:
+  selector: {app: taskboard-api}
+  ports: [{port: 8000, targetPort: 8000}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: taskboard-web
+  namespace: taskboard
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: taskboard-web}
+  template:
+    metadata:
+      labels: {app: taskboard-web}
+    spec:
+      containers:
+        - name: web
+          image: taskboard-web:local
+          imagePullPolicy: Never
+          ports: [{containerPort: 80}]
+          readinessProbe:
+            httpGet: {path: /healthz, port: 80}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /healthz, port: 80}
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 10m, memory: 24Mi}
+            limits: {cpu: 100m, memory: 96Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: taskboard-web
+  namespace: taskboard
+spec:
+  selector: {app: taskboard-web}
+  ports: [{port: 80, targetPort: 80}]
