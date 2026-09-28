@@ -114,4 +114,3 @@ async def delete_task(task_id: int):
         return Response(status_code=204)
     except RedisError:
         raise HTTPException(status_code=503, detail="Redis unavailable")
-
